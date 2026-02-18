@@ -6,6 +6,7 @@
 /** Período de uma demonstração financeira */
 export interface StatementPeriod {
   year: number
+  month?: number   // 1-12. Se presente, indica período mensal.
   startDate: string // ISO date
   endDate: string
 }
@@ -322,14 +323,33 @@ export interface Scenario {
 }
 
 // ----------------------------------------------------------------------------
-// Estado Global
+// Projetos
 // ----------------------------------------------------------------------------
 
-export interface AppState {
+export interface Project {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectData {
   scenarios: Scenario[]
   activeScenarioId: string | null
   mappingTemplates: MappingTemplate[]
   currentStep: number // 0-9 (wizard steps)
+  /** Contas do Livro Razão importado (sem entries, para economizar espaço) */
+  ledgerAccounts: import('./ledger').LedgerAccount[]
+}
+
+// ----------------------------------------------------------------------------
+// Estado Global
+// ----------------------------------------------------------------------------
+
+export interface AppState {
+  projects: Project[]
+  activeProjectId: string | null
+  projectData: Record<string, ProjectData>
 }
 
 // Re-export ledger types
@@ -339,4 +359,6 @@ export type {
   ParsedLedger,
   LedgerMapping,
   LedgerAccountSummary,
+  ChartOfAccountsEntry,
+  ChartOfAccounts,
 } from './ledger'

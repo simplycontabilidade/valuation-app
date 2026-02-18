@@ -17,6 +17,16 @@ export {
   autoMapAccounts,
   aggregateToIncomeStatement,
   aggregateToBalanceSheet,
+  aggregateToMonthlyIncomeStatements,
+  aggregateToMonthlyBalanceSheets,
+  aggregateMonthlyToAnnual,
+  aggregateMonthlyBsToAnnual,
   DRE_TARGET_FIELDS,
   BALANCE_TARGET_FIELDS,
 } from './razao-aggregator'
+export {
+  parseChartOfAccountsFile,
+  generateChartFromLedger,
+  applyChartToLedgerMappings,
+  ALL_TARGET_FIELDS,
+} from './plano-contas-importer'

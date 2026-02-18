@@ -4,13 +4,13 @@ import { Button } from '@/ui/components/ui/button'
 import {
   Upload, Filter, BarChart3, TrendingUp, DollarSign,
   Receipt, Wrench, Percent, PieChart, Download,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, FolderOpen,
 } from 'lucide-react'
 
 const STEPS = [
   { label: 'Importar', icon: Upload, description: 'Importar & Mapear Contas' },
   { label: 'Normalizar', icon: Filter, description: 'Normalizações' },
-  { label: 'Histórico', icon: BarChart3, description: 'Histórico & Métricas' },
+  { label: 'DRE Histórica', icon: BarChart3, description: 'DRE Histórica' },
   { label: 'Receita', icon: TrendingUp, description: 'Drivers de Receita' },
   { label: 'Custos', icon: DollarSign, description: 'Custos e SG&A' },
   { label: 'Tributos', icon: Receipt, description: 'Tributação' },
@@ -25,13 +25,29 @@ interface WizardLayoutProps {
 }
 
 export function WizardLayout({ children }: WizardLayoutProps) {
-  const { currentStep, setCurrentStep, nextStep, prevStep } = useValuationStore()
+  const { activeProjectId, projectData, setCurrentStep, nextStep, prevStep, activeProject, setActiveProject } = useValuationStore()
+
+  const currentStep = activeProjectId ? projectData[activeProjectId]?.currentStep ?? 0 : 0
+  const project = activeProject()
 
   return (
     <div className="flex h-full min-h-screen">
       {/* Sidebar */}
       <aside className="w-64 border-r bg-muted/30 p-4 flex flex-col">
-        <h2 className="text-lg font-bold text-primary mb-6 px-2">Valuation DCF</h2>
+        <h2 className="text-lg font-bold text-primary mb-2 px-2">Valuation DCF</h2>
+
+        {/* Nome do projeto + botão voltar */}
+        {project && (
+          <button
+            onClick={() => setActiveProject(null)}
+            className="flex items-center gap-2 px-2 py-2 mb-4 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-left"
+          >
+            <FolderOpen className="h-4 w-4 shrink-0" />
+            <span className="truncate flex-1">{project.name}</span>
+            <ChevronLeft className="h-3 w-3 shrink-0" />
+          </button>
+        )}
+
         <nav className="flex-1 space-y-1">
           {STEPS.map((step, i) => {
             const Icon = step.icon

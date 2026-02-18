@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { useValuationStore } from '@/store'
 import { TooltipProvider } from '@/ui/components/ui/tooltip'
+import { ProjectSelector } from '@/ui/project-selector'
 import { WizardLayout } from '@/ui/wizard/wizard-layout'
 import { StepImport } from '@/ui/wizard/step-01-import'
 import { StepNormalizations } from '@/ui/wizard/step-02-normalizations'
@@ -27,15 +27,18 @@ const STEPS = [
 ]
 
 function App() {
-  const { currentStep, scenarios, addScenario } = useValuationStore()
+  const { activeProjectId, projectData } = useValuationStore()
 
-  // Create default scenario if none exists
-  useEffect(() => {
-    if (scenarios.length === 0) {
-      addScenario('base')
-    }
-  }, [scenarios.length, addScenario])
+  // Sem projeto ativo — mostrar seletor
+  if (!activeProjectId) {
+    return (
+      <TooltipProvider>
+        <ProjectSelector />
+      </TooltipProvider>
+    )
+  }
 
+  const currentStep = projectData[activeProjectId]?.currentStep ?? 0
   const StepComponent = STEPS[currentStep] ?? StepImport
 
   return (

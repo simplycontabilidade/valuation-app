@@ -10,10 +10,11 @@ import { parseCSV } from '@/adapters/csv-importer'
 import { parseXLSX, detectFileType } from '@/adapters/xlsx-importer'
 import { mapToIncomeStatements, mapToBalanceSheets, INCOME_STATEMENT_FIELDS, BALANCE_SHEET_FIELDS } from '@/adapters/account-mapper'
 import type { AccountMapping } from '@/domain'
-import { FileSpreadsheet, CheckCircle, BookOpen } from 'lucide-react'
+import { FileSpreadsheet, CheckCircle, BookOpen, ClipboardList } from 'lucide-react'
 import { StepRazaoImport } from './step-01-razao-import'
+import { StepPlanoContas } from './step-01-plano-contas'
 
-type ImportMode = 'dre' | 'balance' | 'razao'
+type ImportMode = 'dre' | 'balance' | 'razao' | 'plano'
 
 interface ParsedData {
   headers: string[]
@@ -132,13 +133,25 @@ export function StepImport() {
             </div>
           </CardContent>
         </Card>
+        <Card className={`flex-1 cursor-pointer ${mode === 'plano' ? 'ring-2 ring-primary' : ''}`} onClick={() => setMode('plano')}>
+          <CardContent className="flex items-center gap-3 p-4">
+            <ClipboardList className="h-5 w-5 text-primary" />
+            <div>
+              <p className="font-medium text-sm">Plano de Contas</p>
+              <p className="text-xs text-muted-foreground">Classificação contábil</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Razão mode */}
       {mode === 'razao' && <StepRazaoImport />}
 
+      {/* Plano de Contas mode */}
+      {mode === 'plano' && <StepPlanoContas />}
+
       {/* DRE / Balance mode */}
-      {mode !== 'razao' && (
+      {mode !== 'razao' && mode !== 'plano' && (
         <>
           {/* File upload */}
           {!parsedData && (

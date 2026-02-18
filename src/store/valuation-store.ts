@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
+  Project,
+  ProjectData,
   Scenario,
   ScenarioType,
   IncomeStatement,
@@ -15,9 +17,11 @@ import type {
   DcfAssumptions,
   DcfResult,
   MappingTemplate,
+  LedgerAccount,
 } from '@/domain'
 import { calculateDcf } from '@/calc/dcf'
 import type { DcfInputs } from '@/calc/dcf'
+import { aggregateMonthlyToAnnual, aggregateMonthlyBsToAnnual } from '@/adapters/razao-aggregator'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -116,15 +120,81 @@ function createDefaultScenario(type: ScenarioType = 'base'): Scenario {
   }
 }
 
+function createDefaultProjectData(): ProjectData {
+  const scenario = createDefaultScenario('base')
+  return {
+    scenarios: [scenario],
+    activeScenarioId: scenario.id,
+    mappingTemplates: [],
+    currentStep: 0,
+    ledgerAccounts: [],
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers internos para operar sobre o projeto ativo
+// ---------------------------------------------------------------------------
+
+type StoreState = {
+  activeProjectId: string | null
+  projectData: Record<string, ProjectData>
+  projects: Project[]
+}
+
+function getProjectData(state: StoreState): ProjectData | null {
+  if (!state.activeProjectId) return null
+  return state.projectData[state.activeProjectId] ?? null
+}
+
+function updateProjectData(
+  state: StoreState,
+  updater: (pd: ProjectData) => Partial<ProjectData>,
+): Partial<StoreState> {
+  if (!state.activeProjectId) return {}
+  const current = state.projectData[state.activeProjectId]
+  if (!current) return {}
+  return {
+    projectData: {
+      ...state.projectData,
+      [state.activeProjectId]: { ...current, ...updater(current) },
+    },
+  }
+}
+
+function updateActiveScenario(
+  state: StoreState,
+  updater: (scenario: Scenario) => Partial<Scenario>,
+): Partial<StoreState> {
+  const pd = getProjectData(state)
+  if (!pd) return {}
+  return updateProjectData(state, (data) => ({
+    scenarios: data.scenarios.map((s) =>
+      s.id === data.activeScenarioId
+        ? { ...s, ...updater(s), updatedAt: new Date().toISOString() }
+        : s,
+    ),
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// Store interface
+// ---------------------------------------------------------------------------
+
 export interface ValuationStore {
-  // State
-  scenarios: Scenario[]
-  activeScenarioId: string | null
-  mappingTemplates: MappingTemplate[]
-  currentStep: number
+  // Project state
+  projects: Project[]
+  activeProjectId: string | null
+  projectData: Record<string, ProjectData>
+
+  // Project actions
+  addProject: (name: string) => string
+  renameProject: (id: string, name: string) => void
+  deleteProject: (id: string) => void
+  setActiveProject: (id: string | null) => void
 
   // Computed
   activeScenario: () => Scenario | null
+  activeProject: () => Project | null
 
   // Scenario actions
   addScenario: (type?: ScenarioType) => string
@@ -142,6 +212,7 @@ export interface ValuationStore {
   setIncomeStatements: (statements: IncomeStatement[]) => void
   setBalanceSheets: (sheets: BalanceSheet[]) => void
   setCashFlowStatements: (statements: CashFlowStatement[]) => void
+  setLedgerAccounts: (accounts: LedgerAccount[]) => void
 
   // Normalizations
   addNormalization: (item: Omit<NormalizationItem, 'id'>) => void
@@ -164,43 +235,89 @@ export interface ValuationStore {
   deleteMappingTemplate: (id: string) => void
 }
 
-function updateActiveScenario(
-  state: { scenarios: Scenario[]; activeScenarioId: string | null },
-  updater: (scenario: Scenario) => Partial<Scenario>,
-): { scenarios: Scenario[] } {
-  return {
-    scenarios: state.scenarios.map((s) =>
-      s.id === state.activeScenarioId
-        ? { ...s, ...updater(s), updatedAt: new Date().toISOString() }
-        : s,
-    ),
-  }
-}
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
 
 export const useValuationStore = create<ValuationStore>()(
   persist(
     (set, get) => ({
-      scenarios: [],
-      activeScenarioId: null,
-      mappingTemplates: [],
-      currentStep: 0,
+      projects: [],
+      activeProjectId: null,
+      projectData: {},
+
+      // ---- Project actions ----
+
+      addProject: (name: string) => {
+        const project: Project = {
+          id: generateId(),
+          name,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        const data = createDefaultProjectData()
+        set((state) => ({
+          projects: [...state.projects, project],
+          activeProjectId: project.id,
+          projectData: { ...state.projectData, [project.id]: data },
+        }))
+        return project.id
+      },
+
+      renameProject: (id, name) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, name, updatedAt: new Date().toISOString() } : p,
+          ),
+        }))
+      },
+
+      deleteProject: (id) => {
+        set((state) => {
+          const filtered = state.projects.filter((p) => p.id !== id)
+          const { [id]: _removed, ...rest } = state.projectData
+          return {
+            projects: filtered,
+            projectData: rest,
+            activeProjectId:
+              state.activeProjectId === id
+                ? null
+                : state.activeProjectId,
+          }
+        })
+      },
+
+      setActiveProject: (id) => set({ activeProjectId: id }),
+
+      // ---- Computed ----
 
       activeScenario: () => {
-        const state = get()
-        return state.scenarios.find((s) => s.id === state.activeScenarioId) ?? null
+        const pd = getProjectData(get())
+        if (!pd) return null
+        return pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null
       },
+
+      activeProject: () => {
+        const state = get()
+        return state.projects.find((p) => p.id === state.activeProjectId) ?? null
+      },
+
+      // ---- Scenario actions ----
 
       addScenario: (type = 'base') => {
         const scenario = createDefaultScenario(type)
         set((state) => ({
-          scenarios: [...state.scenarios, scenario],
-          activeScenarioId: scenario.id,
+          ...updateProjectData(state, (pd) => ({
+            scenarios: [...pd.scenarios, scenario],
+            activeScenarioId: scenario.id,
+          })),
         }))
         return scenario.id
       },
 
       duplicateScenario: (id) => {
-        const source = get().scenarios.find((s) => s.id === id)
+        const pd = getProjectData(get())
+        const source = pd?.scenarios.find((s) => s.id === id)
         if (!source) throw new Error(`Cenário ${id} não encontrado`)
         const newScenario: Scenario = {
           ...structuredClone(source),
@@ -210,38 +327,70 @@ export const useValuationStore = create<ValuationStore>()(
           updatedAt: new Date().toISOString(),
         }
         set((state) => ({
-          scenarios: [...state.scenarios, newScenario],
-          activeScenarioId: newScenario.id,
+          ...updateProjectData(state, (pd) => ({
+            scenarios: [...pd.scenarios, newScenario],
+            activeScenarioId: newScenario.id,
+          })),
         }))
         return newScenario.id
       },
 
       deleteScenario: (id) => {
-        set((state) => {
-          const filtered = state.scenarios.filter((s) => s.id !== id)
-          return {
-            scenarios: filtered,
-            activeScenarioId:
-              state.activeScenarioId === id
-                ? filtered[0]?.id ?? null
-                : state.activeScenarioId,
-          }
-        })
-      },
-
-      setActiveScenario: (id) => set({ activeScenarioId: id }),
-
-      renameScenario: (id, name) => {
         set((state) => ({
-          scenarios: state.scenarios.map((s) =>
-            s.id === id ? { ...s, name, updatedAt: new Date().toISOString() } : s,
-          ),
+          ...updateProjectData(state, (pd) => {
+            const filtered = pd.scenarios.filter((s) => s.id !== id)
+            return {
+              scenarios: filtered,
+              activeScenarioId:
+                pd.activeScenarioId === id
+                  ? filtered[0]?.id ?? null
+                  : pd.activeScenarioId,
+            }
+          }),
         }))
       },
 
-      setCurrentStep: (step) => set({ currentStep: step }),
-      nextStep: () => set((state) => ({ currentStep: Math.min(state.currentStep + 1, 9) })),
-      prevStep: () => set((state) => ({ currentStep: Math.max(state.currentStep - 1, 0) })),
+      setActiveScenario: (id) => {
+        set((state) => ({
+          ...updateProjectData(state, () => ({ activeScenarioId: id })),
+        }))
+      },
+
+      renameScenario: (id, name) => {
+        set((state) => ({
+          ...updateProjectData(state, (pd) => ({
+            scenarios: pd.scenarios.map((s) =>
+              s.id === id ? { ...s, name, updatedAt: new Date().toISOString() } : s,
+            ),
+          })),
+        }))
+      },
+
+      // ---- Navigation ----
+
+      setCurrentStep: (step) => {
+        set((state) => ({
+          ...updateProjectData(state, () => ({ currentStep: step })),
+        }))
+      },
+
+      nextStep: () => {
+        set((state) => {
+          const pd = getProjectData(state)
+          if (!pd) return {}
+          return updateProjectData(state, () => ({ currentStep: Math.min(pd.currentStep + 1, 9) }))
+        })
+      },
+
+      prevStep: () => {
+        set((state) => {
+          const pd = getProjectData(state)
+          if (!pd) return {}
+          return updateProjectData(state, () => ({ currentStep: Math.max(pd.currentStep - 1, 0) }))
+        })
+      },
+
+      // ---- Data import ----
 
       setIncomeStatements: (statements) => {
         set((state) => updateActiveScenario(state, () => ({ incomeStatements: statements })))
@@ -254,6 +403,16 @@ export const useValuationStore = create<ValuationStore>()(
       setCashFlowStatements: (statements) => {
         set((state) => updateActiveScenario(state, () => ({ cashFlowStatements: statements })))
       },
+
+      setLedgerAccounts: (accounts) => {
+        // Salvar contas sem entries para economizar espaço no localStorage
+        const stripped = accounts.map((a) => ({ ...a, entries: [] }))
+        set((state) => ({
+          ...updateProjectData(state, () => ({ ledgerAccounts: stripped })),
+        }))
+      },
+
+      // ---- Normalizations ----
 
       addNormalization: (item) => {
         const normalization: NormalizationItem = { ...item, id: generateId() }
@@ -282,6 +441,8 @@ export const useValuationStore = create<ValuationStore>()(
         )
       },
 
+      // ---- Assumptions ----
+
       setRevenueDrivers: (drivers) => {
         set((state) => updateActiveScenario(state, () => ({ revenueDrivers: drivers })))
       },
@@ -306,21 +467,31 @@ export const useValuationStore = create<ValuationStore>()(
         set((state) => updateActiveScenario(state, () => ({ dcfAssumptions: assumptions })))
       },
 
+      // ---- Calculation ----
+
       calculateResults: () => {
         const scenario = get().activeScenario()
         if (!scenario) return null
 
-        const lastIS = scenario.incomeStatements
+        const isMonthly = scenario.incomeStatements.some((s) => s.period.month !== undefined)
+        const annualIS = isMonthly
+          ? aggregateMonthlyToAnnual(scenario.incomeStatements)
+          : scenario.incomeStatements
+
+        const annualBS = isMonthly
+          ? aggregateMonthlyBsToAnnual(scenario.balanceSheets)
+          : scenario.balanceSheets
+
+        const lastIS = annualIS
           .slice()
           .sort((a, b) => a.period.year - b.period.year)
           .at(-1)
 
-        const lastBS = scenario.balanceSheets
+        const lastBS = annualBS
           .slice()
           .sort((a, b) => a.period.year - b.period.year)
           .at(-1)
 
-        // Calculate deduction rate from last historical
         const deductionRate = lastIS && lastIS.grossRevenue > 0
           ? lastIS.deductions / lastIS.grossRevenue
           : 0.10
@@ -355,6 +526,8 @@ export const useValuationStore = create<ValuationStore>()(
         }
       },
 
+      // ---- Mapping templates ----
+
       saveMappingTemplate: (template) => {
         const full: MappingTemplate = {
           ...template,
@@ -362,18 +535,50 @@ export const useValuationStore = create<ValuationStore>()(
           createdAt: new Date().toISOString(),
         }
         set((state) => ({
-          mappingTemplates: [...state.mappingTemplates, full],
+          ...updateProjectData(state, (pd) => ({
+            mappingTemplates: [...pd.mappingTemplates, full],
+          })),
         }))
       },
 
       deleteMappingTemplate: (id) => {
         set((state) => ({
-          mappingTemplates: state.mappingTemplates.filter((t) => t.id !== id),
+          ...updateProjectData(state, (pd) => ({
+            mappingTemplates: pd.mappingTemplates.filter((t) => t.id !== id),
+          })),
         }))
       },
     }),
     {
       name: 'valuation-store',
+      version: 2,
+      migrate: (persisted: unknown, version: number) => {
+        if (version < 2) {
+          // Migrar do formato antigo (flat) para o novo (por projeto)
+          const old = persisted as Record<string, unknown>
+          const projectId = crypto.randomUUID()
+          const now = new Date().toISOString()
+          return {
+            projects: [{
+              id: projectId,
+              name: 'Projeto Padrão',
+              createdAt: now,
+              updatedAt: now,
+            }],
+            activeProjectId: projectId,
+            projectData: {
+              [projectId]: {
+                scenarios: (old.scenarios as Scenario[]) ?? [],
+                activeScenarioId: (old.activeScenarioId as string) ?? null,
+                mappingTemplates: (old.mappingTemplates as MappingTemplate[]) ?? [],
+                currentStep: (old.currentStep as number) ?? 0,
+                ledgerAccounts: [],
+              },
+            },
+          }
+        }
+        return persisted as Record<string, unknown>
+      },
     },
   ),
 )

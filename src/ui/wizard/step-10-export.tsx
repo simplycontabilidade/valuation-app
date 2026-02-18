@@ -11,9 +11,12 @@ import { Download, Copy, Trash2, Plus } from 'lucide-react'
 export function StepExport() {
   const store = useValuationStore()
   const {
-    scenarios, activeScenarioId, addScenario, duplicateScenario,
+    activeProjectId, projectData, addScenario, duplicateScenario,
     deleteScenario, setActiveScenario, renameScenario,
   } = store
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenarios = pd?.scenarios ?? []
+  const activeScenarioId = pd?.activeScenarioId ?? null
   const [editingName, setEditingName] = React.useState<string | null>(null)
 
   const handleExportCSV = () => {

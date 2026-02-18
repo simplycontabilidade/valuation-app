@@ -48,6 +48,21 @@ export interface LedgerMapping {
   autoDetected: boolean        // Se foi classificado automaticamente
 }
 
+/** Entrada do Plano de Contas */
+export interface ChartOfAccountsEntry {
+  code: string
+  name: string
+  accountType: LedgerAccount['accountType']
+  targetField: string
+  targetStatement: 'income_statement' | 'balance_sheet' | 'ignore'
+}
+
+/** Plano de Contas */
+export interface ChartOfAccounts {
+  entries: ChartOfAccountsEntry[]
+  source: 'imported' | 'auto_generated'
+}
+
 /** Resumo agregado por conta */
 export interface LedgerAccountSummary {
   code: string
