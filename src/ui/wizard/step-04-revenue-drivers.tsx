@@ -5,6 +5,7 @@ import { Button } from '@/ui/components/ui/button'
 import { Label } from '@/ui/components/ui/label'
 import { NumberInput } from '@/ui/components/number-input'
 import { formatCurrency, formatPercent } from '@/lib/utils'
+import { aggregateMonthlyToAnnual } from '@/adapters/razao-aggregator'
 import type { RevenueDriver } from '@/domain'
 import {
   XAxis, YAxis, CartesianGrid,
@@ -13,31 +14,51 @@ import {
 import { Plus, Trash2 } from 'lucide-react'
 
 export function StepRevenueDrivers() {
-  const { activeScenario, setRevenueDrivers, setDcfAssumptions } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, setRevenueDrivers, setDcfAssumptions } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const drivers = scenario?.revenueDrivers ?? []
   const assumptions = scenario?.dcfAssumptions
 
-  const baseYear = assumptions?.baseYear ?? new Date().getFullYear() - 1
+  // Obter receita do último ano histórico
+  const lastYearData = React.useMemo(() => {
+    const statements = scenario?.incomeStatements ?? []
+    if (statements.length === 0) return null
+    const isMonthly = statements.some((s) => s.period.month !== undefined)
+    const annual = isMonthly ? aggregateMonthlyToAnnual(statements) : statements
+    const sorted = [...annual].sort((a, b) => a.period.year - b.period.year)
+    const last = sorted[sorted.length - 1]
+    return last ? { year: last.period.year, grossRevenue: last.grossRevenue } : null
+  }, [scenario?.incomeStatements])
+
+  const baseYear = lastYearData?.year ?? assumptions?.baseYear ?? new Date().getFullYear() - 1
   const projYears = assumptions?.projectionYears ?? 5
 
-  // Initialize drivers if empty
+  // Atualizar baseYear das premissas com dado histórico
+  React.useEffect(() => {
+    if (lastYearData && assumptions && assumptions.baseYear !== lastYearData.year) {
+      setDcfAssumptions({ ...assumptions, baseYear: lastYearData.year })
+    }
+  }, [lastYearData?.year]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Inicializar drivers com receita histórica como base e 0% de crescimento
   React.useEffect(() => {
     if (drivers.length === 0 && scenario) {
+      const baseRevenue = lastYearData?.grossRevenue ?? 0
       const initial: RevenueDriver[] = []
       for (let i = 1; i <= projYears; i++) {
         initial.push({
           year: baseYear + i,
-          price: 100,
-          quantity: 10000,
-          growthRate: 0.05,
-          priceGrowth: 0.03,
-          quantityGrowth: 0.02,
+          price: baseRevenue,
+          quantity: 1,
+          growthRate: 0,
+          priceGrowth: 0,
+          quantityGrowth: 0,
         })
       }
       setRevenueDrivers(initial)
     }
-  }, [drivers.length, scenario, projYears, baseYear, setRevenueDrivers])
+  }, [drivers.length, scenario, projYears, baseYear, lastYearData?.grossRevenue, setRevenueDrivers])
 
   const updateDriver = (index: number, field: keyof RevenueDriver, value: number) => {
     const updated = [...drivers]

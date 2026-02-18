@@ -41,13 +41,23 @@ const ACCOUNT_TYPE_OPTIONS: { value: ChartOfAccountsEntry['accountType']; label:
 ]
 
 export function StepPlanoContas() {
-  const { activeProjectId, projectData } = useValuationStore()
-  const ledgerAccounts = activeProjectId ? projectData[activeProjectId]?.ledgerAccounts ?? [] : []
+  const { activeProjectId, projectData, setChartOfAccounts } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const ledgerAccounts = pd?.ledgerAccounts ?? []
+  const storedChart = pd?.chartOfAccounts ?? null
 
   const [chart, setChart] = React.useState<ChartOfAccounts | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [warnings, setWarnings] = React.useState<string[]>([])
   const [saved, setSaved] = React.useState(false)
+
+  // Carregar plano de contas salvo no store (gerado durante importação do Razão)
+  React.useEffect(() => {
+    if (storedChart && !chart) {
+      setChart(storedChart)
+      setSaved(true)
+    }
+  }, [storedChart]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileImport = async (file: File) => {
     try {
@@ -110,7 +120,7 @@ export function StepPlanoContas() {
 
   const handleSave = () => {
     if (!chart) return
-    // O plano de contas é salvo em memória; será usado ao re-mapear o Razão
+    setChartOfAccounts(chart)
     setSaved(true)
   }
 

@@ -8,8 +8,9 @@ import { NumberInput } from '@/ui/components/number-input'
 import type { ReinvestmentModel } from '@/domain'
 
 export function StepReinvestments() {
-  const { activeScenario, setReinvestmentModel } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, setReinvestmentModel } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const model = scenario?.reinvestmentModel
   const drivers = scenario?.revenueDrivers ?? []
   const years = drivers.map((d) => d.year)

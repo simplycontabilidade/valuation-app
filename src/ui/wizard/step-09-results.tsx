@@ -46,8 +46,9 @@ const TABLE_ROWS: RowDef[] = [
 ]
 
 export function StepResults() {
-  const { activeScenario, calculateResults, setDcfAssumptions } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, calculateResults, setDcfAssumptions } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const assumptions = scenario?.dcfAssumptions
   const [result, setResult] = React.useState<DcfResult | null>(scenario?.result ?? null)
   const [sensitivity, setSensitivity] = React.useState<SensitivityTable | null>(null)

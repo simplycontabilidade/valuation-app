@@ -11,8 +11,9 @@ import { Trash2, Plus } from 'lucide-react'
 import type { NormalizationItem } from '@/domain'
 
 export function StepNormalizations() {
-  const { activeScenario, addNormalization, updateNormalization, removeNormalization } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, addNormalization, updateNormalization, removeNormalization } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const normalizations = scenario?.normalizations ?? []
 
   const [newItem, setNewItem] = React.useState<Omit<NormalizationItem, 'id'>>({

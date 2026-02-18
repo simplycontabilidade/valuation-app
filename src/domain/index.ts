@@ -340,6 +340,10 @@ export interface ProjectData {
   currentStep: number // 0-9 (wizard steps)
   /** Contas do Livro Razão importado (sem entries, para economizar espaço) */
   ledgerAccounts: import('./ledger').LedgerAccount[]
+  /** Mapeamento de contas do Razão */
+  ledgerMappings: import('./ledger').LedgerMapping[]
+  /** Plano de Contas (importado ou gerado) */
+  chartOfAccounts: import('./ledger').ChartOfAccounts | null
 }
 
 // ----------------------------------------------------------------------------

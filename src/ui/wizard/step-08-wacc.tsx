@@ -7,8 +7,9 @@ import { formatPercent } from '@/lib/utils'
 import { calculateFullWacc, calculateCostOfEquity } from '@/calc/wacc'
 
 export function StepWacc() {
-  const { activeScenario, setWaccModel } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, setWaccModel } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const model = scenario?.waccModel
 
   if (!model) return null

@@ -38,8 +38,9 @@ function periodKey(period: StatementPeriod): string {
 type ViewMode = 'monthly' | 'annual'
 
 export function StepHistory() {
-  const { activeScenario } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const [viewMode, setViewMode] = React.useState<ViewMode>('monthly')
 
   const rawStatements = React.useMemo(() =>

@@ -23,8 +23,9 @@ interface ParsedData {
 }
 
 export function StepImport() {
-  const { setIncomeStatements, setBalanceSheets, activeScenario } = useValuationStore()
-  const scenario = activeScenario()
+  const { setIncomeStatements, setBalanceSheets, activeProjectId, projectData } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
 
   const [mode, setMode] = React.useState<ImportMode>('dre')
   const [parsedData, setParsedData] = React.useState<ParsedData | null>(null)

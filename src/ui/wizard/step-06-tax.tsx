@@ -8,8 +8,9 @@ import { formatPercent } from '@/lib/utils'
 import type { TaxModel, TaxRegime, TaxRateMethod } from '@/domain'
 
 export function StepTax() {
-  const { activeScenario, setTaxModel } = useValuationStore()
-  const scenario = activeScenario()
+  const { activeProjectId, projectData, setTaxModel } = useValuationStore()
+  const pd = activeProjectId ? projectData[activeProjectId] : null
+  const scenario = pd ? pd.scenarios.find((s) => s.id === pd.activeScenarioId) ?? null : null
   const taxModel = scenario?.taxModel ?? {
     regime: 'lucro_real' as TaxRegime,
     method: 'manual' as TaxRateMethod,

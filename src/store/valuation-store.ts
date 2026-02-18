@@ -18,6 +18,8 @@ import type {
   DcfResult,
   MappingTemplate,
   LedgerAccount,
+  LedgerMapping,
+  ChartOfAccounts,
 } from '@/domain'
 import { calculateDcf } from '@/calc/dcf'
 import type { DcfInputs } from '@/calc/dcf'
@@ -128,6 +130,8 @@ function createDefaultProjectData(): ProjectData {
     mappingTemplates: [],
     currentStep: 0,
     ledgerAccounts: [],
+    ledgerMappings: [],
+    chartOfAccounts: null,
   }
 }
 
@@ -213,6 +217,8 @@ export interface ValuationStore {
   setBalanceSheets: (sheets: BalanceSheet[]) => void
   setCashFlowStatements: (statements: CashFlowStatement[]) => void
   setLedgerAccounts: (accounts: LedgerAccount[]) => void
+  setLedgerMappings: (mappings: LedgerMapping[]) => void
+  setChartOfAccounts: (chart: ChartOfAccounts | null) => void
 
   // Normalizations
   addNormalization: (item: Omit<NormalizationItem, 'id'>) => void
@@ -412,6 +418,18 @@ export const useValuationStore = create<ValuationStore>()(
         }))
       },
 
+      setLedgerMappings: (mappings) => {
+        set((state) => ({
+          ...updateProjectData(state, () => ({ ledgerMappings: mappings })),
+        }))
+      },
+
+      setChartOfAccounts: (chart) => {
+        set((state) => ({
+          ...updateProjectData(state, () => ({ chartOfAccounts: chart })),
+        }))
+      },
+
       // ---- Normalizations ----
 
       addNormalization: (item) => {
@@ -573,6 +591,8 @@ export const useValuationStore = create<ValuationStore>()(
                 mappingTemplates: (old.mappingTemplates as MappingTemplate[]) ?? [],
                 currentStep: (old.currentStep as number) ?? 0,
                 ledgerAccounts: [],
+                ledgerMappings: [],
+                chartOfAccounts: null,
               },
             },
           }

@@ -16,6 +16,7 @@ import {
   DRE_TARGET_FIELDS, BALANCE_TARGET_FIELDS,
 } from '@/adapters/razao-aggregator'
 import { formatCurrency } from '@/lib/utils'
+import { generateChartFromLedger } from '@/adapters/plano-contas-importer'
 import type { ParsedLedger, LedgerMapping, LedgerAccountSummary } from '@/domain/ledger'
 import { CheckCircle, AlertTriangle, FileSearch, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
 
@@ -46,7 +47,7 @@ const ACCOUNT_TYPE_COLORS: Record<string, 'default' | 'secondary' | 'destructive
 }
 
 export function StepRazaoImport() {
-  const { setIncomeStatements, setBalanceSheets, setLedgerAccounts } = useValuationStore()
+  const { setIncomeStatements, setBalanceSheets, setLedgerAccounts, setLedgerMappings, setChartOfAccounts } = useValuationStore()
 
   const [subStep, setSubStep] = React.useState<SubStep>('upload')
   const [rawRows, setRawRows] = React.useState<RawRow[]>([])
@@ -181,6 +182,11 @@ export function StepRazaoImport() {
         setBalanceSheets([bs])
       }
     }
+
+    // Salvar mapeamentos e gerar plano de contas automaticamente
+    setLedgerMappings(mappings)
+    const chart = generateChartFromLedger(parsedLedger.accounts)
+    setChartOfAccounts(chart)
 
     setApplied(true)
     setSubStep('confirm')
